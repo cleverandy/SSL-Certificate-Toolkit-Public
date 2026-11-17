@@ -100,7 +100,7 @@ Recommended: **Python 3.12 x64 Windows Installer**, with Python Launcher `py` in
 dist\SSL_Certificate_Toolkit.exe
 ```
 
-PyInstaller packs the Python interpreter, PySide6/Qt and `cryptography` into a standalone Windows executable, but the compiled program must be tested on the actual Windows target OS. The receiving PC does not need Python or OpenSSL.
+PyInstaller packs the Python interpreter, PySide6/Qt and `cryptography` into a standalone Windows executable, but the compiled program must be tested on the actual Windows target OS. The automated branding test checks first-party source files only; generated `.venv`, `build`, and `dist` folders are intentionally excluded. A Qt offscreen font-directory warning during GUI smoke tests is not by itself a build failure. The receiving PC does not need Python or OpenSSL.
 
 For Python source debugging after dependencies are installed:
 

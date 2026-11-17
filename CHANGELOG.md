@@ -14,3 +14,9 @@ No executable is included. Windows PySide6 visual validation and EXE build are s
 - Added an **About** page featuring version, author, MIT license, GitHub source, program overview, feature summary, local-processing information and accurate certificate-authority / certification disclaimer.
 - Added author, license and project overview to the README.
 - No change to CSR, PEM, PFX or certificate-processing algorithms.
+
+## v3.2.0 — Windows build/test fix (pre-release)
+
+- Fixed the generic-branding test falsely flagging paths embedded by Python in generated `.venv/Scripts/activate.bat`. Scanning now excludes virtual environments, Python/Qt caches, and build output while continuing to test all first-party text source.
+- Added regression checks for this exclusion and for detecting prohibited branding in actual source files.
+- Configure a Windows font directory for headless Qt smoke tests when available; a font-directory warning is otherwise non-fatal.

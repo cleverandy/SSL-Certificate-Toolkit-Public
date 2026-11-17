@@ -8,6 +8,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+# Qt's offscreen platform can warn when PySide6's old lib/fonts folder is absent.
+# Point it to installed Windows fonts for GUI smoke tests; the EXE does not
+# need to bundle a separate font directory for normal Windows operation.
+if os.name == 'nt' and 'QT_QPA_FONTDIR' not in os.environ:
+    fonts = Path(os.environ.get('WINDIR', r'C:\Windows')) / 'Fonts'
+    if fonts.is_dir():
+        os.environ['QT_QPA_FONTDIR'] = str(fonts)
 try:
     from PySide6.QtWidgets import QApplication
     import app as gui
