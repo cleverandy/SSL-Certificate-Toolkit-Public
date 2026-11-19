@@ -1,10 +1,10 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-title SSL Certificate Toolkit v3.4.0 - Windows Build
+title SSL Certificate Toolkit v3.4.1 - Windows Build
 
 echo ======================================================
-echo   SSL Certificate Toolkit v3.4.0 - EXE Builder
+echo   SSL Certificate Toolkit v3.4.1 - EXE Builder
 echo ======================================================
 echo.
 echo Windows x64 + Python 3.12 recommended.
@@ -45,12 +45,12 @@ python -m unittest discover -s tests -q
 if errorlevel 1 goto :error
 
 echo [5/5] Building standalone Windows EXE with UI assets...
-python -m PyInstaller --noconfirm --clean --onefile --windowed --add-data "assets;assets" --version-file windows_version_info.txt --name SSL_Certificate_Toolkit_v3.4.0 app.py
+python -m PyInstaller --noconfirm --clean --onefile --windowed --add-data "assets;assets" --version-file windows_version_info.txt --name SSL_Certificate_Toolkit_v3.4.1 app.py
 if errorlevel 1 goto :error
 
 echo.
 echo BUILD SUCCESSFUL
-echo   %CD%\dist\SSL_Certificate_Toolkit_v3.4.0.exe
+echo   %CD%\dist\SSL_Certificate_Toolkit_v3.4.1.exe
 echo.
 echo Test the EXE on Windows and verify a non-production certificate chain before production use.
 pause

@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QDialog, QFileDialog, QFormLayout, QFrame,
     QGridLayout, QHBoxLayout, QLabel, QLineEdit, QListWidget, QMainWindow,
     QMessageBox, QPlainTextEdit, QPushButton, QScrollArea, QSizePolicy,
-    QStackedWidget, QTableWidget, QTableWidgetItem, QToolButton,
+    QStackedWidget, QTableWidget, QTableWidgetItem, QToolButton, QTextEdit,
     QVBoxLayout, QWidget, QAbstractItemView, QHeaderView, QSplashScreen, QProgressBar,
 )
 
@@ -29,9 +29,12 @@ import website_safety
 import csv
 from email.message import EmailMessage
 from export_picture import ExportPictureDialog
+from theme_manager import ThemeManager, ACCENTS
+from watch_card import WatchCard
+from email_composer import EmailComposer
 
 
-APP_VERSION = "3.4.0"
+APP_VERSION = "3.4.1"
 APP_AUTHOR = "cleverandy"
 APP_LICENSE = "MIT License"
 APP_REPO_URL = "https://github.com/cleverandy/SSL-Certificate-Toolkit-Public"
@@ -435,6 +438,7 @@ class MainWindow(QMainWindow):
         if self.theme_mode not in ('system','light','dark'):
             self.theme_mode = 'system'
         self.dark = self._theme_is_dark()
+        self.theme_manager = ThemeManager(self.settings)
         self.live_result = None
         self._previous_fingerprint = {}
         self.live_worker = None
@@ -478,7 +482,8 @@ class MainWindow(QMainWindow):
                                      ("Live SSL Checker", 5, 'shield'),
                                      ("SSL Watch List", 6, 'shield'),
                                      ("Activity Log", 7, 'files'),
-                                     ("About", 4, 'info')):
+                                     ("About", 4, 'info'),
+                                     ("Settings", 8, 'info')):
             b = QPushButton(name)
             b.setProperty('icon_name', icon_name)
             b.setIcon(vector_icon(icon_name))
@@ -491,13 +496,25 @@ class MainWindow(QMainWindow):
             self.nav_buttons.append(b)
         sidenav.addStretch(1)
         sidenav.addWidget(horizontal_line())
+        # Compact three-button appearance switcher (System / Light / Dark).
+        self.appearance_group = QWidget()
+        self.appearance_group.setObjectName('appearanceGroup')
+        switch = QHBoxLayout(self.appearance_group)
+        switch.setContentsMargins(3, 3, 3, 3)
+        switch.setSpacing(2)
+        self.appearance_buttons = {}
+        for mode, icon_name, tooltip in [('system','monitor','System'),('light','sun','Light'),('dark','moon','Dark')]:
+            btn = QPushButton()
+            btn.setObjectName('appearanceOption')
+            btn.setToolTip(tooltip)
+            btn.setCheckable(True)
+            btn.setFixedSize(37, 29)
+            btn.setIconSize(QSize(17,17))
+            btn.clicked.connect(lambda _checked=False, m=mode: self.set_appearance(m))
+            switch.addWidget(btn)
+            self.appearance_buttons[mode] = (btn,icon_name)
+        sidenav.addWidget(self.appearance_group, alignment=Qt.AlignmentFlag.AlignHCenter)
         sidenav.addWidget(label("Local processing · no uploads", "hint"))
-        sidenav.addWidget(label('Appearance', 'hint'))
-        self.theme_button = QPushButton()
-        self.theme_button.setIconSize(QSize(19, 19))
-        self.theme_button.clicked.connect(self._theme_changed)
-        self._update_theme_button()
-        sidenav.addWidget(self.theme_button)
         sidenav.addWidget(label(f"v{APP_VERSION}  •  PySide6", "footer"))
         sidenav.addWidget(label("Developed by cleverandy", "footer"))
 
@@ -511,6 +528,7 @@ class MainWindow(QMainWindow):
         self.live_page = self._page()
         self.watch_page = self._page()
         self.activity_page = self._page()
+        self.settings_page = self._page()
         self._build_generator()
         self._build_results()
         self._build_inspector()
@@ -519,6 +537,7 @@ class MainWindow(QMainWindow):
         self._build_live_page()
         self._build_watch_page()
         self._build_activity_page()
+        self._build_settings_page()
         self.apply_theme()
         QGuiApplication.styleHints().colorSchemeChanged.connect(self._system_theme_changed)
         self.navigate(0)
@@ -556,19 +575,17 @@ class MainWindow(QMainWindow):
             return False
         return QGuiApplication.styleHints().colorScheme() == Qt.ColorScheme.Dark
 
-    def _theme_changed(self):
-        modes = ('system', 'light', 'dark')
-        self.theme_mode = modes[(modes.index(self.theme_mode) + 1) % len(modes)]
-        self.settings.setValue('appearance/theme', self.theme_mode)
-        self._update_theme_button()
+    def set_appearance(self, mode):
+        if mode not in ('system','light','dark'): return
+        self.theme_mode = mode
+        self.settings.setValue('appearance/theme', mode)
         self.dark = self._theme_is_dark()
         self.apply_theme()
 
-    def _update_theme_button(self):
-        names = {'system': ('System', 'monitor'), 'light': ('Light', 'sun'), 'dark': ('Dark', 'moon')}
-        title, symbol = names[self.theme_mode]
-        self.theme_button.setText(title)
-        self.theme_button.setIcon(vector_icon(symbol))
+    def _update_appearance_buttons(self):
+        for mode,(btn,icon_name) in self.appearance_buttons.items():
+            btn.setChecked(mode == self.theme_mode)
+            btn.setIcon(vector_icon(icon_name, self.theme_manager.accent(self.dark) if mode == self.theme_mode else (DARK if self.dark else LIGHT)['muted'], 18))
 
     def _system_theme_changed(self, _scheme):
         if self.theme_mode == 'system':
@@ -577,7 +594,7 @@ class MainWindow(QMainWindow):
 
     def apply_theme(self):
         QApplication.instance().setProperty("ssl_dark", self.dark)
-        QApplication.instance().setStyleSheet(qt_style(self.dark))
+        QApplication.instance().setStyleSheet(self.theme_manager.stylesheet(qt_style(self.dark), self.dark))
         # Update any already displayed SSL health labels when switching appearance.
         if getattr(self, 'live_result', None) is not None and hasattr(self, 'live_health'):
             palette = ({'valid': '#49D795', 'warning': '#FFD166', 'critical': '#FF827D'}
@@ -589,16 +606,16 @@ class MainWindow(QMainWindow):
         ink = DARK['text'] if self.dark else LIGHT['muted']
         for b in getattr(self, 'nav_buttons', []):
             b.setIcon(vector_icon(b.property('icon_name'), ink))
-        if hasattr(self, 'theme_button'):
-            self._update_theme_button()
-        if hasattr(self, 'watch_table'):
+        if hasattr(self, 'appearance_buttons'):
+            self._update_appearance_buttons()
+        if hasattr(self, 'watch_cards'):
             self._update_watch_table()
         for section in getattr(self, '_disclosures', []):
             section.set_open(section._is_open)
 
     def navigate(self, page_idx: int):
         self.pages.setCurrentIndex(page_idx)
-        target = {0:0,1:0,2:1,3:2,5:3,6:4,7:5,4:6}.get(page_idx, 0)
+        target = {0:0,1:0,2:1,3:2,5:3,6:4,7:5,4:6,8:7}.get(page_idx, 0)
         for i, b in enumerate(self.nav_buttons):
             b.setChecked(i == target)
         scroll = self.pages.currentWidget()
@@ -1762,44 +1779,26 @@ class MainWindow(QMainWindow):
     # --- V3.4 Watch List (bounded queue, independent of live checker) ---
     def _build_watch_page(self):
         p=self.watch_page
-        self._heading(p, 'Certificate tools / 05', 'SSL Watch List',
-                      'Local saved targets. Connection failures never erase the last successful certificate result.')
+        self._heading(p,'Certificate tools / 05','SSL Watch List',
+                      'Expand a website to inspect its last successful certificate and connection status.')
         _, area=card(p)
         controls=QHBoxLayout()
-        controls.addWidget(button('Refresh All', self.refresh_all_watch, primary=True))
-        controls.addWidget(button('Add Website', self._watch_prompt_add))
+        controls.addWidget(button('Refresh All',self.refresh_all_watch,primary=True))
+        controls.addWidget(button('Add Website',self._watch_prompt_add))
+        controls.addWidget(button('Remove Selected',self.remove_selected_watch))
         controls.addStretch(1)
         area.addLayout(controls)
-        self.watch_progress=label('Ready', 'muted')
-        area.addWidget(self.watch_progress)
-        self.watch_table=QTableWidget(0,5)
-        self.watch_table.setHorizontalHeaderLabels(['Website','Connection','Certificate Expiry','Days Left','Details'])
-        self.watch_table.horizontalHeader().setSectionResizeMode(0,QHeaderView.ResizeMode.Stretch)
-        self.watch_table.horizontalHeader().setSectionResizeMode(4,QHeaderView.ResizeMode.ResizeToContents)
-        self.watch_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.watch_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.watch_table.setMinimumHeight(260)
-        area.addWidget(self.watch_table)
-        self.watch_details=QPlainTextEdit()
-        self.watch_details.setReadOnly(True)
-        self.watch_details.setMaximumHeight(180)
-        self.watch_details.setPlaceholderText('Select a website to view last known certificate and connection details.')
-        area.addWidget(self.watch_details)
-        self.watch_table.itemSelectionChanged.connect(self._show_watch_details)
-        actions=QHBoxLayout()
-        actions.addWidget(button('Refresh Selected',self.refresh_selected_watch))
-        actions.addWidget(button('Inspect Selected',self.inspect_selected_watch))
-        actions.addWidget(button('Email Reminder',self.email_watch_reminder))
-        actions.addWidget(button('Remove Selected',self.remove_selected_watch))
-        actions.addStretch(1)
-        area.addLayout(actions)
+        self.watch_progress=label('Ready','muted');area.addWidget(self.watch_progress)
+        self.watch_cards=QVBoxLayout();self.watch_cards.setSpacing(8)
+        area.addLayout(self.watch_cards)
+        self.watch_card_widgets={}
         p.addStretch(1)
-        _, opts=card(p)
+        _,opts=card(p)
         self.watch_auto=QCheckBox('Refresh automatically when the application starts')
         self.watch_auto.setChecked(self.settings.value('watch/refresh_on_startup',True,type=bool))
         self.watch_auto.toggled.connect(lambda value:self.settings.setValue('watch/refresh_on_startup',value))
         opts.addWidget(self.watch_auto)
-        opts.addWidget(label('Maximum 3 concurrent TLS checks. The next website starts when a check finishes.', 'hint'))
+        opts.addWidget(label('Maximum 3 concurrent TLS checks. Unreachable sites retain their last successful certificate.', 'hint'))
         self._update_watch_table()
 
     def _watch_prompt_add(self):
@@ -1824,44 +1823,44 @@ class MainWindow(QMainWindow):
         self._update_watch_table()
 
     def _selected_watch(self):
-        row=self.watch_table.currentRow()
-        return self.watch_items[row] if 0<=row<len(self.watch_items) else None
+        return next((x for x in self.watch_items if x['target']==getattr(self,'selected_watch_target',None)),None)
+
+    def _select_watch(self, target):
+        self.selected_watch_target=target
+        for key,widget in self.watch_card_widgets.items(): widget.set_selected(key==target)
 
     def _update_watch_table(self):
-        if not hasattr(self,'watch_table'): return
-        self.watch_table.setRowCount(len(self.watch_items))
-        for row,item in enumerate(self.watch_items):
-            days=watch_store.remaining_days(item)
-            good=item.get('last_good')
-            connection=('Checking…' if item['target'] in self.watch_active else
-                        'Unreachable / Unknown' if item.get('error') else 'Connected (last check)')
-            expiry=good.get('expires_at','')[:10] if good else 'Not checked'
-            vals=[item['target'],connection,expiry,str(days) if days is not None else '—','Expand below']
-            for col,value in enumerate(vals):
-                cell=QTableWidgetItem(value)
-                if col in (2,3) and days is not None:
-                    from PySide6.QtGui import QBrush
-                    color='#FF827D' if self.dark else '#B42318'
-                    if days>15: color=('#FFD166' if self.dark else '#A66B12') if days<=30 else ('#49D795' if self.dark else '#14804A')
-                    cell.setForeground(QBrush(QColor(color)))
-                self.watch_table.setItem(row,col,cell)
+        if not hasattr(self,'watch_cards'): return
+        # Preserve expanded card state and selection during refresh.
+        expanded={key:w.expanded for key,w in self.watch_card_widgets.items()}
+        while self.watch_cards.count():
+            item=self.watch_cards.takeAt(0)
+            if item.widget(): item.widget().deleteLater()
+        self.watch_card_widgets={}
+        for item in self.watch_items:
+            widget=WatchCard(item, watch_store.remaining_days(item),
+                             item['target'] in self.watch_active,
+                             expanded.get(item['target'],False),self.dark)
+            widget.selected.connect(self._select_watch)
+            widget.refresh_requested.connect(self._refresh_watch_target)
+            widget.inspect_requested.connect(lambda key:self._watch_action(key,self.inspect_selected_watch))
+            widget.email_requested.connect(lambda key:self._watch_action(key,self.email_watch_reminder))
+            self.watch_cards.addWidget(widget)
+            self.watch_card_widgets[item['target']]=widget
+        if getattr(self,'selected_watch_target',None) not in self.watch_card_widgets:
+            self.selected_watch_target=None
+        if self.selected_watch_target: self._select_watch(self.selected_watch_target)
         self.watch_progress.setText(f'{len(self.watch_active)} checking · {len(self.watch_queue)} queued · {len(self.watch_items)} watched')
 
+    def _watch_action(self,key,callback):
+        self._select_watch(key);callback()
+
+    def _refresh_watch_target(self,key):
+        self._select_watch(key);self.refresh_selected_watch()
+
     def _show_watch_details(self):
-        item=self._selected_watch()
-        if not item: self.watch_details.clear(); return
-        good=item.get('last_good') or {}
-        lines=[f'Target: {item["target"]}',f'Latest attempt: {item.get("last_attempt") or "Never"}',
-               f'Connection status: {item.get("error") or "Last attempt succeeded"}',
-               f'Last successful check: {good.get("checked_at","Never")}',
-               f'Last known expiry: {good.get("expires_at","Unknown")}',
-               f'Issuer: {good.get("issuer","Unknown")}',f'Subject CN: {good.get("subject_cn","Unknown")}',
-               f'Certificate type: {good.get("certificate_type","Unknown")}',
-               f'Hostname match: {good.get("hostname_ok","Unknown")}',f'Trusted: {good.get("trust_ok","Unknown")}',
-               f'SHA-256: {good.get("fingerprint","Unknown")}',
-               'SANs: '+', '.join(good.get('sans',[]))]
-        if item.get('error'): lines.append('WARNING: Certificate details are historical, NOT a current verification.')
-        self.watch_details.setPlainText('\n'.join(lines))
+        # Details are displayed inside each expandable website card.
+        pass
 
     def refresh_all_watch(self):
         if self.watch_active or self.watch_queue: return
@@ -1923,42 +1922,63 @@ class MainWindow(QMainWindow):
         if not item: return
         good=item.get('last_good')
         if not good:
-            QMessageBox.information(self,'No certificate','Check the website successfully before creating a reminder.')
+            QMessageBox.information(self,'No certificate','Check this website successfully before creating a reminder.')
             return
-        days=watch_store.remaining_days(item)
-        message=EmailMessage()
-        message['Subject']='SSL Certificate Expiry Notice - '+item['target']
-        checker=self.settings.value('export/checker_name','',type=str)
-        contact=self.settings.value('export/checker_email','',type=str)
-        body=(f'Website: {item["target"]}\nLast known certificate expiry: {good.get("expires_at")}\n'
-              f'Days remaining (based on saved certificate): {days}\n'
-              f'Last successful check: {good.get("checked_at")}\n'
-              f'Latest connection attempt: {item.get("last_attempt")}\n'
-              f'Current connection: {"Unreachable / unknown" if item.get("error") else "Last check succeeded"}\n'
-              f'SSL Checked by: {checker}\nContact Email: {contact}\n'
-              'This is a draft; confirm the recipient and current certificate status before sending.\n')
-        message.set_content(body)
-        # Optional PNG from the certificate verification picture, selected explicitly.
-        attach=QMessageBox.question(self,'Attach verification picture?',
-            'Attach a previously exported SSL verification PNG to the email draft?',
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-        if attach==QMessageBox.StandardButton.Yes:
-            picture,_=QFileDialog.getOpenFileName(self,'Select verification picture','','PNG (*.png)')
-            if picture:
-                image_path=Path(picture)
-                if image_path.stat().st_size>5*1024*1024:
-                    QMessageBox.warning(self,'Image too large','Maximum attachment size is 5 MB.')
-                    return
-                if image_path.read_bytes()[:8]!=b'\x89PNG\r\n\x1a\n':
-                    QMessageBox.warning(self,'Invalid picture','Selected file is not a PNG.')
-                    return
-                message.add_attachment(image_path.read_bytes(),maintype='image',subtype='png',filename=image_path.name)
-        path,_=QFileDialog.getSaveFileName(self,'Save email draft',
-            str(Path.home()/(item['target'].replace(':','_')+'_ssl_reminder.eml')),'Email draft (*.eml)')
-        if path:
-            Path(path).write_bytes(message.as_bytes())
-            activity_log.record('Email Draft Exported',item['target'],path)
-            QMessageBox.information(self,'Email draft saved','Open the .eml file in your email application, review the recipient and verify the attached picture if any.')
+        # A current LiveResult is necessary to render the actual certificate picture.
+        # Never fabricate a "current verified" image from stale watch-list metadata.
+        result=self.live_result if self.live_result is not None and watch_store.watch_key(
+            self.live_result.target.host+':'+str(self.live_result.target.port))==item['target'] and self.live_result.fingerprint == good.get('fingerprint') and self.live_result.checked_at.isoformat() == good.get('checked_at') and not item.get('error') else None
+        composer=EmailComposer(self,item,result,self.settings)
+        composer.exec()
+
+    def _build_settings_page(self):
+        p=self.settings_page
+        self._heading(p,'Preferences','Settings','Personalize appearance, verification identity and monitoring.')
+        _,appearance=card(p)
+        appearance.addWidget(label('APPEARANCE','kicker'))
+        appearance.addWidget(label('Appearance mode: use the compact System / Light / Dark controls in the sidebar.','muted'))
+        appearance.addWidget(label('Accent Theme','sectionTitle'))
+        self.accent_combo=QComboBox()
+        for key,config in ACCENTS.items(): self.accent_combo.addItem(config['name'],key)
+        self.accent_combo.setCurrentIndex(max(0,self.accent_combo.findData(self.theme_manager.accent_name)))
+        self.accent_combo.currentIndexChanged.connect(self._accent_changed)
+        appearance.addWidget(self.accent_combo)
+        _,identity=card(p)
+        identity.addWidget(label('VERIFICATION IDENTITY','kicker'))
+        identity.addWidget(label('SSL Checked by','hint'))
+        self.checker_name_setting=QLineEdit(self.settings.value('export/checker_name','',type=str))
+        self.checker_name_setting.setMaxLength(60);identity.addWidget(self.checker_name_setting)
+        identity.addWidget(label('Contact Email','hint'))
+        self.checker_email_setting=QLineEdit(self.settings.value('export/checker_email','',type=str))
+        self.checker_email_setting.setMaxLength(120);identity.addWidget(self.checker_email_setting)
+        identity.addWidget(button('Save Verification Identity',self._save_identity,primary=True))
+        _,monitor=card(p)
+        monitor.addWidget(label('STARTUP & MONITORING','kicker'))
+        self.refresh_setting=QCheckBox('Refresh SSL Watch List on application startup')
+        self.refresh_setting.setChecked(self.settings.value('watch/refresh_on_startup',True,type=bool))
+        self.refresh_setting.toggled.connect(self._save_refresh_setting)
+        monitor.addWidget(self.refresh_setting)
+        monitor.addWidget(label('Expiry notifications require a background scheduler; they are not enabled in this release.','hint'))
+        p.addStretch(1)
+
+    def _accent_changed(self):
+        self.theme_manager.set_accent(self.accent_combo.currentData())
+        self.apply_theme()
+
+    def _save_identity(self):
+        from export_picture import clean_name,clean_email
+        try:
+            name=clean_name(self.checker_name_setting.text())
+            email=clean_email(self.checker_email_setting.text())
+        except ValueError as exc:
+            QMessageBox.warning(self,'Invalid verification identity',str(exc));return
+        self.settings.setValue('export/checker_name',name)
+        self.settings.setValue('export/checker_email',email)
+        self.statusBar().showMessage('Verification identity saved',4000)
+
+    def _save_refresh_setting(self,enabled):
+        self.settings.setValue('watch/refresh_on_startup',enabled)
+        self.watch_auto.setChecked(enabled)
 
     # --- V3.4 Activity Log ---
     def _build_activity_page(self):

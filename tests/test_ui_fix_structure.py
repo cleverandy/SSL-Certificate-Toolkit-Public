@@ -1,4 +1,4 @@
-"""Static regressions for the v3.4.0 Windows UI fixes."""
+"""Static regressions for the v3.4.1 Windows UI fixes."""
 import ast
 import unittest
 from pathlib import Path
@@ -9,14 +9,15 @@ EXPORT = (ROOT / 'export_picture.py').read_text(encoding='utf-8')
 
 class UIFixTests(unittest.TestCase):
     def test_version_consistency(self):
-        self.assertIn('APP_VERSION = "3.4.0"', APP)
+        self.assertIn('APP_VERSION = "3.4.1"', APP)
         workflow = (ROOT / '.github/workflows/build-windows.yml').read_text(encoding='utf-8')
-        self.assertIn('SSL_Certificate_Toolkit_v3.4.0.exe', workflow)
+        self.assertIn('SSL_Certificate_Toolkit_v3.4.1.exe', workflow)
         self.assertNotIn('v3.3.0', workflow)
 
-    def test_appearance_cycles_without_combo(self):
-        self.assertIn("modes = ('system', 'light', 'dark')", APP)
-        self.assertIn("self.settings.setValue('appearance/theme', self.theme_mode)", APP)
+    def test_three_appearance_buttons_without_combo(self):
+        self.assertIn("self.appearance_buttons = {}", APP)
+        self.assertIn("def set_appearance(self, mode):", APP)
+        self.assertIn("self.settings.setValue('appearance/theme', mode)", APP)
         self.assertNotIn('self.theme_combo', APP)
 
     def test_dns_actions_adjacent(self):

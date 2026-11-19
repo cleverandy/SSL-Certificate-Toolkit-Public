@@ -15,7 +15,7 @@ from PySide6.QtGui import QPainter, QPainterPath, QPen, QColor, QPixmap
 
 from live_ssl import LiveResult
 
-APP_VERSION = "3.4.0"
+APP_VERSION = "3.4.1"
 
 
 def shield_check_pixmap(color: str, size: int = 22) -> QPixmap:

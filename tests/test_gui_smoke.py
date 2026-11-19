@@ -35,7 +35,7 @@ class TestQtSmoke(unittest.TestCase):
         cls.window.close()
 
     def test_initial_page_and_bundle_panel(self):
-        self.assertEqual(self.window.pages.count(), 8)
+        self.assertEqual(self.window.pages.count(), 9)
         self.assertIsNotNone(self.window.import_drop)
         self.assertFalse(self.window.analyze_button.isEnabled())
         self.assertFalse(self.window.export_button.isEnabled())

@@ -1,3 +1,13 @@
+## v3.4.1 — Appearance, Watch List and Email Composer (preview)
+
+- Compact three-button System / Light / Dark selector in the sidebar.
+- Centralized ThemeManager with five persistent accent palettes and shared Qt dialog styling.
+- Settings page for accent and SSL verification identity.
+- Independent expandable Watch List website cards with Add / Remove adjacent.
+- Editable renewal email composer; Classic Outlook integration with automatic PNG attachment when a matching fresh live SSL result is available.
+- Default mailto integration (text only; attachments not supported).
+- Windows background notifications, scheduled startup and Gmail API are not implemented.
+
 ## v3.4.0 — Source Preview
 - SSL Watch List: persistent records, 3 concurrent checks, startup refresh, connection errors separated from last successful certificate, expiry color coding, expanded details.
 - Certificate Activity Log: SQLite, bounded retention, CSV export, clearing.
