@@ -35,7 +35,7 @@ class TestQtSmoke(unittest.TestCase):
         cls.window.close()
 
     def test_initial_page_and_bundle_panel(self):
-        self.assertEqual(self.window.pages.count(), 5)
+        self.assertEqual(self.window.pages.count(), 8)
         self.assertIsNotNone(self.window.import_drop)
         self.assertFalse(self.window.analyze_button.isEnabled())
         self.assertFalse(self.window.export_button.isEnabled())
@@ -45,7 +45,7 @@ class TestQtSmoke(unittest.TestCase):
     def test_about_page_navigation(self):
         self.window.navigate(4)
         self.assertEqual(self.window.pages.currentIndex(), 4)
-        self.assertTrue(self.window.nav_buttons[3].isChecked())
+        self.assertTrue(self.window.nav_buttons[6].isChecked())
 
     def test_certificate_viewer_field_order_and_generated_match(self):
         self.window.navigate(0)

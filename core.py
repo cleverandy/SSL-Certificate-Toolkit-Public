@@ -168,8 +168,21 @@ def openssl_command(fields: dict[str, str], primary: str, extra: Sequence[str], 
             f"  -addext {shlex.quote(san_ext)}")
 
 
+def read_limited(path: str | Path, max_bytes: int = 5 * 1024 * 1024) -> bytes:
+    """Prevent giant/malicious local inputs from unbounded allocation."""
+    path = Path(path)
+    size = path.stat().st_size
+    if size > max_bytes:
+        raise ValueError(f'Input file is too large ({size} bytes; limit {max_bytes} bytes).')
+    with path.open('rb') as stream:
+        result = stream.read(max_bytes + 1)
+    if len(result) > max_bytes:
+        raise ValueError(f'Input file exceeds the {max_bytes} byte limit.')
+    return result
+
+
 def load_csr(path: str | Path) -> x509.CertificateSigningRequest:
-    return parse_csr(Path(path).read_bytes())
+    return parse_csr(read_limited(path))
 
 
 def parse_csr(data: bytes) -> x509.CertificateSigningRequest:
@@ -526,9 +539,11 @@ def safe_write_files(directory: Path, outputs: dict[str, bytes], overwrite: bool
         raise FileExistsError("These files already exist: " + ", ".join(str(p) for p in existing))
     written = []
     for name, data in outputs.items():
-        if Path(name).name != name:
+        if Path(name).name != name or name in ('.', '..'):
             raise ValueError("Unsafe output file name")
         path = directory / name
+        if path.is_symlink():
+            raise ValueError('Refusing to overwrite a symbolic link: ' + str(path))
         path.write_bytes(data)
         if path.suffix.lower() in (".key", ".pfx"):
             try:

@@ -1,0 +1,4 @@
+SSL Certificate Toolkit v3.4.0 - Windows build-failure hotfix
+Fixed SQLite connection handle closure and outdated GUI smoke assertions.
+Tested in Linux: 48 tests, 44 passed, 4 skipped (PySide6 unavailable), 0 failures.
+Windows GUI tests and EXE build must be rerun on Windows; not yet verified.
