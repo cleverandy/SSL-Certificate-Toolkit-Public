@@ -10,7 +10,7 @@ TREE = ast.parse(SOURCE)
 class AboutPageTests(unittest.TestCase):
     def test_author_metadata(self):
         self.assertIn('APP_AUTHOR = "cleverandy"', SOURCE)
-        self.assertIn('APP_VERSION = "3.4.1"', SOURCE)
+        self.assertIn('from app_version import APP_VERSION', SOURCE)
         self.assertIn('Developed by cleverandy', SOURCE)
         self.assertIn('APP_LICENSE = "MIT License"', SOURCE)
 

@@ -1,7 +1,8 @@
-"""Static regressions for the v3.4.1 Windows UI fixes."""
+"""Static regressions for the Windows UI fixes."""
 import ast
 import unittest
 from pathlib import Path
+from app_version import APP_VERSION
 
 ROOT = Path(__file__).resolve().parents[1]
 APP = (ROOT / 'app.py').read_text(encoding='utf-8')
@@ -9,9 +10,9 @@ EXPORT = (ROOT / 'export_picture.py').read_text(encoding='utf-8')
 
 class UIFixTests(unittest.TestCase):
     def test_version_consistency(self):
-        self.assertIn('APP_VERSION = "3.4.1"', APP)
+        self.assertIn('from app_version import APP_VERSION', APP)
         workflow = (ROOT / '.github/workflows/build-windows.yml').read_text(encoding='utf-8')
-        self.assertIn('SSL_Certificate_Toolkit_v3.4.1.exe', workflow)
+        self.assertIn(f'SSL_Certificate_Toolkit_v{APP_VERSION}.exe', workflow)
         self.assertNotIn('v3.3.0', workflow)
 
     def test_three_appearance_buttons_without_combo(self):

@@ -34,7 +34,7 @@ from watch_card import WatchCard
 from email_composer import EmailComposer
 
 
-APP_VERSION = "3.4.1"
+from app_version import APP_VERSION
 APP_AUTHOR = "cleverandy"
 APP_LICENSE = "MIT License"
 APP_REPO_URL = "https://github.com/cleverandy/SSL-Certificate-Toolkit-Public"
@@ -427,6 +427,84 @@ class SSLInspectWorker(QThread):
             self.failure.emit(str(exc)[:750])
 
 
+class AccentSelector(QWidget):
+    """Single-row, responsive segmented accent picker matching Appearance."""
+    def __init__(self, manager, changed, parent=None):
+        super().__init__(parent)
+        self.manager = manager
+        self.changed = changed
+        self.dark = False
+        self.setObjectName('accentSegmentGroup')
+        self.segment_layout = QHBoxLayout(self)
+        self.segment_layout.setContentsMargins(3, 3, 3, 3)
+        self.segment_layout.setSpacing(2)
+        self.buttons = {}
+        self._layout_mode = None
+        for name, data in ACCENTS.items():
+            btn = QPushButton(data['name'], self)
+            btn.setObjectName('accentSwatchOption')
+            btn.setCheckable(True)
+            btn.setToolTip(data['name'] + (' (Windows accent)' if name == 'system' else ''))
+            btn.setMinimumHeight(32)
+            btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            btn.setFont(QFont('Segoe UI', 9))
+            btn.clicked.connect(lambda checked=False, key=name: self.changed(key))
+            self.segment_layout.addWidget(btn)
+            self.buttons[name] = btn
+        self._reflow(0)
+
+    def _reflow(self, width):
+        # Use measured font metrics instead of a fixed window-width assumption.
+        fm = next(iter(self.buttons.values())).fontMetrics()
+        full_width = sum(fm.horizontalAdvance(ACCENTS[n]['name']) + 18 + 8 + 16
+                         for n in self.buttons) + self.segment_layout.spacing() * (len(self.buttons)-1) + 6
+        mode = 'full' if width >= full_width else 'compact'
+        if mode == self._layout_mode:
+            return
+        self._layout_mode = mode
+        for name, btn in self.buttons.items():
+            btn.setText(ACCENTS[name]['name'] if mode == 'full' else '')
+            btn.setMinimumWidth(28 if mode == 'compact' else 0)
+        self.updateGeometry()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._reflow(event.size().width())
+
+    def refresh(self, dark):
+        self.dark = dark
+        self.setStyleSheet('QWidget#accentSegmentGroup {'
+                           f'background:{"#17212D" if dark else "#E9EEF4"};'
+                           'border-radius:9px;}')
+        for name, btn in self.buttons.items():
+            color = self.manager.accent(dark) if name == 'system' else ACCENTS[name]['dark' if dark else 'light']
+            pix = QPixmap(18, 18)
+            pix.fill(Qt.GlobalColor.transparent)
+            painter = QPainter(pix)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor(color))
+            painter.drawRoundedRect(QRectF(1, 1, 16, 16), 4, 4)
+            if name == self.manager.accent_name:
+                painter.setPen(QPen(QColor('#FFFFFF' if name != 'gold' else '#1F2937'), 1.7))
+                painter.drawLine(5, 9, 8, 12)
+                painter.drawLine(8, 12, 13, 6)
+            painter.end()
+            btn.setIcon(QIcon(pix))
+            btn.setIconSize(QSize(18, 18))
+            selected = name == self.manager.accent_name
+            btn.setChecked(selected)
+            bg = '#344459' if dark else '#FFFFFF'
+            ink = '#E8EFF9' if dark else '#243246'
+            hover = '#2A384A' if dark else '#DFE7F1'
+            btn.setStyleSheet('QPushButton#accentSwatchOption {'
+                              f'color:{ink};background:{bg if selected else "transparent"};'
+                              'border:0px;border-radius:7px;'
+                              'font-family:"Segoe UI";font-size:11px;'
+                              'padding:4px 8px;icon-size:18px;}'
+                              f'QPushButton#accentSwatchOption:hover {{background:{bg if selected else hover};}}')
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -481,9 +559,7 @@ class MainWindow(QMainWindow):
                                      ("PEM / PFX Builder", 3, 'files'),
                                      ("Live SSL Checker", 5, 'shield'),
                                      ("SSL Watch List", 6, 'shield'),
-                                     ("Activity Log", 7, 'files'),
-                                     ("About", 4, 'info'),
-                                     ("Settings", 8, 'info')):
+                                     ("Activity Log", 7, 'files')):
             b = QPushButton(name)
             b.setProperty('icon_name', icon_name)
             b.setIcon(vector_icon(icon_name))
@@ -495,6 +571,19 @@ class MainWindow(QMainWindow):
             sidenav.addWidget(b)
             self.nav_buttons.append(b)
         sidenav.addStretch(1)
+        sidenav.addWidget(horizontal_line())
+        # Secondary navigation stays pinned to the bottom, above appearance.
+        for name, idx, icon_name in (("Settings", 8, 'info'), ("About", 4, 'info')):
+            b = QPushButton(name)
+            b.setProperty('icon_name', icon_name)
+            b.setIcon(vector_icon(icon_name))
+            b.setIconSize(QSize(20, 20))
+            b.setObjectName("nav")
+            b.setCheckable(True)
+            b.setMinimumHeight(42)
+            b.clicked.connect(lambda _checked=False, n=idx: self.navigate(n))
+            sidenav.addWidget(b)
+            self.nav_buttons.append(b)
         sidenav.addWidget(horizontal_line())
         # Compact three-button appearance switcher (System / Light / Dark).
         self.appearance_group = QWidget()
@@ -540,6 +629,7 @@ class MainWindow(QMainWindow):
         self._build_settings_page()
         self.apply_theme()
         QGuiApplication.styleHints().colorSchemeChanged.connect(self._system_theme_changed)
+        QApplication.instance().applicationStateChanged.connect(self._application_state_changed)
         self.navigate(0)
         self.statusBar().showMessage("Ready · cryptographic operations run on this computer")
         self._update_generator()
@@ -587,6 +677,11 @@ class MainWindow(QMainWindow):
             btn.setChecked(mode == self.theme_mode)
             btn.setIcon(vector_icon(icon_name, self.theme_manager.accent(self.dark) if mode == self.theme_mode else (DARK if self.dark else LIGHT)['muted'], 18))
 
+    def _application_state_changed(self, state):
+        # Refresh Windows system accent when returning from Windows Settings.
+        if state == Qt.ApplicationState.ApplicationActive and self.theme_manager.accent_name == 'system':
+            self.apply_theme()
+
     def _system_theme_changed(self, _scheme):
         if self.theme_mode == 'system':
             self.dark = self._theme_is_dark()
@@ -608,6 +703,8 @@ class MainWindow(QMainWindow):
             b.setIcon(vector_icon(b.property('icon_name'), ink))
         if hasattr(self, 'appearance_buttons'):
             self._update_appearance_buttons()
+        if hasattr(self, 'accent_selector'):
+            self.accent_selector.refresh(self.dark)
         if hasattr(self, 'watch_cards'):
             self._update_watch_table()
         for section in getattr(self, '_disclosures', []):
@@ -1938,11 +2035,8 @@ class MainWindow(QMainWindow):
         appearance.addWidget(label('APPEARANCE','kicker'))
         appearance.addWidget(label('Appearance mode: use the compact System / Light / Dark controls in the sidebar.','muted'))
         appearance.addWidget(label('Accent Theme','sectionTitle'))
-        self.accent_combo=QComboBox()
-        for key,config in ACCENTS.items(): self.accent_combo.addItem(config['name'],key)
-        self.accent_combo.setCurrentIndex(max(0,self.accent_combo.findData(self.theme_manager.accent_name)))
-        self.accent_combo.currentIndexChanged.connect(self._accent_changed)
-        appearance.addWidget(self.accent_combo)
+        self.accent_selector = AccentSelector(self.theme_manager, self._accent_changed, appearance.parentWidget())
+        appearance.addWidget(self.accent_selector)
         _,identity=card(p)
         identity.addWidget(label('VERIFICATION IDENTITY','kicker'))
         identity.addWidget(label('SSL Checked by','hint'))
@@ -1961,8 +2055,8 @@ class MainWindow(QMainWindow):
         monitor.addWidget(label('Expiry notifications require a background scheduler; they are not enabled in this release.','hint'))
         p.addStretch(1)
 
-    def _accent_changed(self):
-        self.theme_manager.set_accent(self.accent_combo.currentData())
+    def _accent_changed(self, name):
+        self.theme_manager.set_accent(name)
         self.apply_theme()
 
     def _save_identity(self):
@@ -2046,29 +2140,52 @@ def main():
     app.setApplicationName("SSL Certificate Toolkit")
     app.setOrganizationName("SSL Certificate Toolkit")
     app.setFont(QFont("Segoe UI", 10))
-    splash_pix = QPixmap(520, 240)
-    splash_pix.fill(QColor('#172437'))
+    # Splash uses persisted appearance/accent before the main window is created.
+    startup_settings = QSettings('SSLToolkit', 'SSL Certificate Toolkit')
+    startup_mode = startup_settings.value('appearance/theme', 'system', type=str)
+    if startup_mode == 'system':
+        startup_dark = QGuiApplication.styleHints().colorScheme() == Qt.ColorScheme.Dark
+    else:
+        startup_dark = startup_mode == 'dark'
+    startup_accent = ThemeManager(startup_settings).accent(startup_dark)
+    splash_pix = QPixmap(520, 230)
+    splash_pix.fill(QColor('#19212D' if startup_dark else '#F5F7FA'))
     painter = QPainter(splash_pix)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-    painter.setPen(QPen(QColor('#49D795'), 2.4))
+    icon_bg = QColor('#26384A' if startup_dark else '#E7EEF9')
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.setBrush(icon_bg)
+    painter.drawRoundedRect(QRectF(34, 46, 62, 62), 13, 13)
+    painter.setPen(QPen(QColor(startup_accent), 3))
     painter.setBrush(Qt.BrushStyle.NoBrush)
     from PySide6.QtGui import QPainterPath
     shield_path = QPainterPath()
-    shield_path.moveTo(23, 48); shield_path.lineTo(32, 51)
-    shield_path.lineTo(32, 61); shield_path.cubicTo(32, 68, 27, 73, 23, 76)
-    shield_path.cubicTo(19, 73, 14, 68, 14, 61)
-    shield_path.lineTo(14, 51); shield_path.closeSubpath()
+    shield_path.moveTo(65, 58); shield_path.lineTo(83, 65)
+    shield_path.lineTo(83, 80); shield_path.cubicTo(83, 91, 73, 99, 65, 103)
+    shield_path.cubicTo(57, 99, 47, 91, 47, 80)
+    shield_path.lineTo(47, 65); shield_path.closeSubpath()
     painter.drawPath(shield_path)
-    painter.drawLine(18, 61, 22, 65); painter.drawLine(22, 65, 29, 57)
-    painter.setPen(QColor('#F1F5FC'))
-    title_font = QFont('Segoe UI', 19, QFont.Weight.Bold)
-    painter.setFont(title_font)
-    painter.drawText(QRectF(47, 42, 440, 52), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+    painter.drawLine(56, 80, 63, 86); painter.drawLine(63, 86, 76, 72)
+    text_color = QColor('#F5F7FA' if startup_dark else '#17243A')
+    muted = QColor('#A7B6C9' if startup_dark else '#6B7D94')
+    painter.setPen(text_color)
+    painter.setFont(QFont('Segoe UI', 18, QFont.Weight.DemiBold))
+    painter.drawText(QRectF(116, 51, 387, 36), Qt.AlignmentFlag.AlignVCenter,
                      'SSL Certificate Toolkit')
-    painter.setFont(QFont('Segoe UI', 11))
-    painter.setPen(QColor('#B7C6D9'))
-    painter.drawText(QRectF(35, 101, 450, 30), f'Version {APP_VERSION}  ·  CSR / SSL Inspector')
-    painter.drawText(QRectF(35, 180, 450, 30), 'Developed by cleverandy')
+    painter.setPen(muted)
+    painter.setFont(QFont('Segoe UI', 10))
+    painter.drawText(QRectF(116, 90, 385, 25), 'Certificate Management Utility')
+    # Author aligns to the title, not the left edge of the icon.
+    painter.setFont(QFont('Segoe UI', 9))
+    painter.drawText(QRectF(116, 173, 260, 22), 'Developed by cleverandy')
+    painter.drawText(QRectF(415, 173, 75, 22),
+                     Qt.AlignmentFlag.AlignRight, f'v{APP_VERSION}')
+    # Indeterminate activity line; no fabricated completion percentage.
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.setBrush(QColor('#354356' if startup_dark else '#DFE6EF'))
+    painter.drawRoundedRect(QRectF(34, 210, 452, 3), 1.5, 1.5)
+    painter.setBrush(QColor(startup_accent))
+    painter.drawRoundedRect(QRectF(34, 210, 100, 3), 1.5, 1.5)
     painter.end()
     splash = QSplashScreen(splash_pix)
     splash.show()

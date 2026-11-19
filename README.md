@@ -1,10 +1,10 @@
-# SSL Certificate Toolkit v3.4.1 (Source Preview)
+# SSL Certificate Toolkit v3.4.2 (Source Preview)
 
-New in v3.4.1: SSL Watch List with up to three parallel fresh TLS inspections, persisted last-known-good certificate data and separate connection errors; startup refresh setting; local SQLite activity log for CSR/KEY and PEM/PFX outputs; exportable email reminder draft with optional previously exported verification PNG; expanded certificate Subject display; updated picture header and splash screen.
+Previously added in v3.4.1: SSL Watch List with up to three parallel fresh TLS inspections, persisted last-known-good certificate data and separate connection errors; startup refresh setting; local SQLite activity log for CSR/KEY and PEM/PFX outputs; exportable email reminder draft with optional previously exported verification PNG; expanded certificate Subject display; updated picture header and splash screen.
 
 **Important:** This source preview has not been GUI-tested on Windows. No third-party phishing/malware reputation provider is integrated. The email feature creates a local .eml draft; it does not send email automatically. The tool only examines TLS endpoints and cannot certify a website is malware-free.
 
-# SSL Certificate Toolkit v3.4.1
+# SSL Certificate Toolkit v3.4.2
 
 **Developed by [cleverandy](https://github.com/cleverandy) · MIT licensed · Generic Edition**
 
@@ -16,9 +16,9 @@ Windows 11 **Fluent-inspired PySide6 GUI** with a sidebar, collapsible advanced 
 
 The toolkit is intended for developers, system administrators, and IT professionals who need a convenient GUI for certificate preparation and troubleshooting.
 
-**Author:** [cleverandy](https://github.com/cleverandy)
-**Version:** 3.4.1 (Generic Edition)
-**License:** MIT License — see [LICENSE](LICENSE)
+**Author:** [cleverandy](https://github.com/cleverandy)  
+**Version:** 3.3.1 (Generic Edition)  
+**License:** MIT License — see [LICENSE](LICENSE)  
 **Project:** https://github.com/cleverandy/SSL-Certificate-Toolkit-Public
 
 > **Certification / trust notice:** This tool is not a Certificate Authority and is not certified or endorsed by a CA. The offline Certificate Viewer does not establish OS trust or revocation status; the new Live Checker attempts an actual operating-system/Python trust-store handshake but does not verify revocation or phishing reputation. The exported image is a point-in-time diagnostic, not a third-party certification. Always verify live findings with your target platform.
@@ -105,7 +105,7 @@ Recommended: **Python 3.12 x64 Windows Installer**, with Python Launcher `py` in
 3. After tests and compilation, find the app at:
 
 ```text
-dist\SSL_Certificate_Toolkit_v3.3.1.exe
+dist\SSL_Certificate_Toolkit_v3.4.2.exe
 ```
 
 PyInstaller packs the Python interpreter, PySide6/Qt and `cryptography` into a standalone Windows executable, but the compiled program must be tested on the actual Windows target OS. The automated branding test checks first-party source files only; generated `.venv`, `build`, and `dist` folders are intentionally excluded. A Qt offscreen font-directory warning during GUI smoke tests is not by itself a build failure. The receiving PC does not need Python or OpenSSL.
@@ -169,11 +169,11 @@ v3.2 preserves the v3 certificate processing features, with the following change
 
 ### Updated launch and build instructions
 
-1. Unzip v3.2 into a **new directory** (do not mix it with v3.0 source files).
+1. Unzip the current source package into a **new directory** (do not mix it with v3.0 source files).
 2. Double-click `build_windows.bat` to install dependencies, run automated tests, and compile the standalone EXE. It also bundles `assets\check_white.png` for the checkbox icon.
 3. To launch the GUI directly without a console, double-click `run_windows.bat`.
 4. To debug in CMD, double-click `run_debug_windows.bat`.
-5. For an independent GUI program with no Python installation or CMD window, run `dist\SSL_Certificate_Toolkit_v3.3.1.exe`.
+5. For an independent GUI program with no Python installation or CMD window, run `dist\SSL_Certificate_Toolkit_v3.4.2.exe`.
 
 **Validation limits:** The source package is generated and tested in a Linux tool environment. The cryptographic core and source-level GUI regression tests pass; live Qt/Windows GUI tests require running the included test suite on a Windows host with PySide6 installed. The package does **not** contain a precompiled Windows executable.
 
@@ -204,3 +204,10 @@ Improved dark theme colors, dialog controls and scrollbar tracks; added lightwei
 - A matching successful Live SSL Checker result is required to generate a fresh verification picture for an email reminder; otherwise the email draft remains editable without an image.
 - The Windows default email handler is opened via mailto and cannot automatically attach images.
 - Gmail API, Windows background expiry notifications, scheduled startup and Windows EXE validation are not implemented in this preview.
+
+
+### v3.4.2 UI refinement
+
+- Accent Theme now uses a single-row segmented selector consistent with Appearance; responsive swatches-only mode, 8px label spacing and compact typography.
+- Settings and About are pinned to the bottom of the sidebar above the Appearance switcher.
+- All certificate and monitoring functionality remains unchanged.

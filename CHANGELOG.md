@@ -1,3 +1,12 @@
+## v3.4.2 — Responsive Accent Selector and Minimal Professional Splash (preview)
+
+- Fixed Picture Preview / PNG export version label by sharing the application version constant.
+- Corrected Windows executable numeric resource version to 3.4.2.0.
+- Added 11 single-word accent choices, including Windows System accent.
+- Replaced Settings accent combo with responsive rounded-square swatches and compact layout.
+- Updated splash layout, theme-aware background, and author/title alignment.
+- Kept native Windows title bar unchanged.
+
 ## v3.4.1 — Appearance, Watch List and Email Composer (preview)
 
 - Compact three-button System / Light / Dark selector in the sidebar.
@@ -74,3 +83,7 @@ No executable is included. Windows PySide6 visual validation and EXE build are s
 ### v3.4.0 Windows test hotfix
 - Close SQLite activity database connections explicitly to prevent Windows WinError 32 during temporary directory cleanup.
 - Update GUI smoke tests for the eight-page navigation and About sidebar position.
+
+### v3.4.2 UI refinement (post-GUI fix)
+- Match Accent Theme segmented selector styling to Appearance, with compact text, swatch spacing, and single-row responsive behavior.
+- Move Settings and About navigation to the fixed bottom sidebar section.
